@@ -230,7 +230,7 @@ dados_limpos %>%
 library(tidyverse)
 
 dados_limpos %>%
-  filter(x1_em_qual_campus_voce_estuda == "Benfica") %>%
+  filter(x1_em_qual_campus_voce_estuda == "Labomar") %>%
   filter(!x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Prefiro não responder", "Não concordo e nem discordo")) %>%
   mutate(curso_agrupado = fct_lump_n(x3_qual_curso_voce_esta_realizando, n = 15)) %>%
   mutate(
@@ -244,7 +244,7 @@ dados_limpos %>%
   scale_x_continuous(labels = scales::percent_format()) +
   scale_fill_brewer(palette = "RdYlBu") +
   labs(
-    title = "Impacto no Desempenho Acadêmico por Curso no Campus do Benfica",
+    title = "Impacto no Desempenho Acadêmico por Curso no Campus do Labomar",
     x = "Proporção de Respostas",
     y = "Curso",
     fill = "Desempenho Afetado?"
@@ -254,3 +254,230 @@ dados_limpos %>%
     legend.position = "top",
     axis.text.y = element_text(size = 8)
   )
+
+
+
+
+
+
+
+
+library(tidyverse)
+dados_limpos %>%
+  mutate(impacto_academico = case_when(
+    x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Concordo totalmente", "Concordo parcialmente") ~ "Afetado",
+    x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Discordo totalmente", "Discordo parcialmente") ~ "Não Afetado",
+    TRUE ~ "Outro"
+  )) %>%
+  filter(impacto_academico != "Outro") %>%
+  separate_rows(x6_quais_tipos_de_violencia_voce_ja_vivenciou_ou_viu_outra_pessoa_vivenciar, sep = ";") %>%
+  mutate(violencia_limpa = str_trim(x6_quais_tipos_de_violencia_voce_ja_vivenciou_ou_viu_outra_pessoa_vivenciar)) %>%
+  filter(violencia_limpa != "" & violencia_limpa != "Prefiro não informar") %>%
+  ggplot(aes(y = violencia_limpa, fill = impacto_academico)) +
+  geom_bar(position = "fill") +
+  scale_x_continuous(labels = scales::percent_format()) +
+  scale_fill_manual(values = c("Afetado" = "#d9480f", "Não Afetado" = "#555555")) +
+  labs(
+    title = "Relação entre Tipo de Violência e Impacto no Desempenho Acadêmico",
+    subtitle = "Qual tipo de violência tem maior probabilidade de afetar os estudos?",
+    x = "Proporção de Respondentes",
+    y = "Tipo de Violência",
+    fill = "Desempenho Acadêmico"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "top")
+
+
+
+
+
+
+
+
+
+
+
+#----------------------------------------------------------------------------------
+# ANÁLISE FINAL: MINORIA (X4) vs. VIOLÊNCIA (X6) vs. IMPACTO (X15)
+#----------------------------------------------------------------------------------
+library(tidyverse)
+
+# Supondo que seu dataframe limpo se chame 'dados_limpos'
+dados_limpos %>%
+  # 1. Cria o grupo de "Impacto Acadêmico" a partir das respostas da P15
+  mutate(impacto_academico = case_when(
+    x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Concordo totalmente", "Concordo parcialmente") ~ "Desempenho Afetado",
+    x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Discordo totalmente", "Discordo parcialmente") ~ "Desempenho Não Afetado",
+    TRUE ~ "Outro" # Agrupa "Não concordo e nem discordo" e "Prefiro não responder"
+  )) %>%
+  
+  # 2. Cria o grupo de "Identificação com Minoria" a partir das respostas da P4
+  mutate(grupo_minoria = case_when(
+    x4_voce_se_identifica_com_alguma_minoria_social == "Não" ~ "Não Pertence a Minoria",
+    x4_voce_se_identifica_com_alguma_minoria_social == "Prefiro não responder" ~ "Outro",
+    TRUE ~ "Pertence a Minoria" # Agrupa todas as outras respostas ("Parda/preta", "LGBTQIA+", etc.)
+  )) %>%
+  
+  # 3. Filtra para manter apenas os grupos que queremos comparar
+  filter(impacto_academico != "Outro",
+         grupo_minoria != "Outro") %>%
+  
+  # 4. Separa os tipos de violência da P6
+  separate_rows(x6_quais_tipos_de_violencia_voce_ja_vivenciou_ou_viu_outra_pessoa_vivenciar, sep = ";") %>%
+  
+  # 5. Limpa os rótulos da violência
+  mutate(violencia_limpa = str_trim(x6_quais_tipos_de_violencia_voce_ja_vivenciou_ou_viu_outra_pessoa_vivenciar)) %>%
+  filter(violencia_limpa != "" & violencia_limpa != "Prefiro não informar") %>%
+  
+  # 6. Cria o gráfico
+  ggplot(aes(y = violencia_limpa, fill = impacto_academico)) +
+  
+  geom_bar(position = "fill") +
+  
+  # Cria um painel separado para cada grupo de minoria
+  facet_wrap(~ grupo_minoria) +
+  
+  scale_x_continuous(labels = scales::percent) +
+  scale_fill_manual(values = c("Desempenho Afetado" = "#d9480f", "Desempenho Não Afetado" = "#555555")) +
+  
+  labs(
+    title = "Impacto Acadêmico da Violência por Tipo e Identificação com Minoria",
+    subtitle = "Comparando a proporção de estudantes com desempenho afetado",
+    x = "Proporção de Respondentes",
+    y = "Tipo de Violência",
+    fill = "Impacto no Desempenho"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold", size = 10)
+  )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+library(tidyverse)
+library(ggradar)
+
+top_5_minorias <- dados_limpos %>%
+  filter(!x4_voce_se_identifica_com_alguma_minoria_social %in% c("Não", "Prefiro não responder")) %>%
+  count(x4_voce_se_identifica_com_alguma_minoria_social, sort = TRUE) %>%
+  top_n(5, n) %>%
+  pull(x4_voce_se_identifica_com_alguma_minoria_social)
+
+dados_radar_final <- dados_limpos %>%
+  filter(x4_voce_se_identifica_com_alguma_minoria_social %in% top_5_minorias) %>%
+  separate_rows(x6_quais_tipos_de_violencia_voce_ja_vivenciou_ou_viu_outra_pessoa_vivenciar, sep = ";") %>%
+  mutate(
+    violencia = str_trim(x6_quais_tipos_de_violencia_voce_ja_vivenciou_ou_viu_outra_pessoa_vivenciar),
+    violencia = str_remove(violencia, "Violência ")
+  ) %>%
+  filter(violencia != "" & violencia != "Prefiro não informar") %>%
+  count(group = x4_voce_se_identifica_com_alguma_minoria_social, violencia) %>%
+  pivot_wider(names_from = violencia, values_from = n) %>%
+  mutate(across(everything(), ~replace_na(., 0)))
+
+ggradar(
+  dados_radar_final,
+  grid.min = 0,
+  grid.mid = 15,
+  grid.max = 30,
+  group.line.width = 1,
+  group.point.size = 3,
+  legend.title = "Top 5 Grupos de Minoria",
+  legend.position = "bottom"
+) +
+  labs(
+    title = "Perfil de Violência Sofrida pelas Top 5 Minorias"
+  ) +
+  theme(
+    axis.text.x = element_text(size = 9),
+    legend.text = element_text(size = 8),
+    legend.key.size = unit(0.5, 'cm')
+  )
+
+
+
+#----------------------------------------------------------------------------------
+# ANÁLISE: IMPACTO ACADÊMICO (P15) NAS TOP 5 MINORIAS (X4)
+#----------------------------------------------------------------------------------
+library(tidyverse)
+
+# PASSO 1: IDENTIFICAR AS 5 PRINCIPAIS CATEGORIAS DE MINORIA
+# (Este passo é o mesmo de antes, para garantir que estamos focando nos grupos corretos)
+top_5_minorias <- dados_limpos %>%
+  filter(!x4_voce_se_identifica_com_alguma_minoria_social %in% c("Não", "Prefiro não responder")) %>%
+  count(x4_voce_se_identifica_com_alguma_minoria_social, sort = TRUE) %>%
+  top_n(5, n) %>%
+  pull(x4_voce_se_identifica_com_alguma_minoria_social)
+
+
+# PASSO 2: CALCULAR A PORCENTAGEM DE IMPACTO PARA CADA GRUPO
+impacto_por_minoria <- dados_limpos %>%
+  # Filtra para manter apenas as 5 principais categorias de minoria
+  filter(x4_voce_se_identifica_com_alguma_minoria_social %in% top_5_minorias) %>%
+  
+  # Cria a nossa coluna de agrupamento "Sim vs Não" a partir da P15
+  mutate(impacto_academico = case_when(
+    x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Concordo totalmente", "Concordo parcialmente") ~ "Afetado",
+    x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Discordo totalmente", "Discordo parcialmente") ~ "Não Afetado",
+    TRUE ~ "Outro"
+  )) %>%
+  filter(impacto_academico != "Outro") %>%
+  
+  # Conta quantos "Afetados" e "Não Afetados" existem para cada grupo de minoria
+  count(group = x4_voce_se_identifica_com_alguma_minoria_social, impacto_academico) %>%
+  
+  # Agrupa por minoria para calcular a porcentagem
+  group_by(group) %>%
+  mutate(porcentagem = n / sum(n)) %>%
+  
+  # Filtra para manter apenas a porcentagem que nos interessa ("Afetado")
+  filter(impacto_academico == "Afetado")
+
+
+# PASSO 3: CRIAÇÃO DO GRÁFICO DE BARRAS ORDENADO
+ggplot(impacto_por_minoria, aes(x = porcentagem, y = reorder(group, porcentagem))) +
+  geom_col(fill = "#d9480f") +
+  
+  # Adiciona os rótulos de porcentagem diretamente no gráfico
+  geom_text(aes(label = scales::percent(porcentagem, accuracy = 1)), hjust = -0.2) +
+  
+  # Formata o eixo X para mostrar porcentagens
+  scale_x_continuous(labels = scales::percent, limits = c(0, 0.6), expand = expansion(mult = c(0, 0.05))) +
+  
+  labs(
+    title = "Impacto no Desempenho Acadêmico por Grupo de Minoria",
+    subtitle = "Proporção de estudantes que relataram ter o desempenho afetado",
+    x = "% com Desempenho Afetado",
+    y = "Grupo de Minoria"
+  ) +
+  theme_minimal()
+
+
+
+
+
