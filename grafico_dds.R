@@ -6,6 +6,7 @@ if (!require("devtools")) {
 }
 
 devtools::install_github("ricardo-bion/ggradar")
+library(ggradar)
 file.choose()
 planilha <- ("C:\\Users\\Emanuel\\Desktop\\faculdade\\1 semestre\\análiseexplodedados\\planilha_pesquisa.csv") 
 
@@ -94,20 +95,6 @@ ggplot(dados_labomar, aes(x = "", y = total_relatos, fill = tipo_violencia_limpo
 #gráfico spider chart
 
 
-
-
-
-#------------------------------------------------------------------------------------
-# CÓDIGO FINAL CORRIGIDO PARA O RADAR DE PERFIL DE IMPACTO
-#------------------------------------------------------------------------------------
-
-# Carregue as bibliotecas, se ainda não o fez
-library(tidyverse)
-library(ggradar)
-
-# PASSO 1: PREPARAÇÃO E CÁLCULO DOS DADOS (COM A LÓGICA CORRETA)
-
-# Identifica as 3 ações mais citadas na P14
 top_3_acoes <- dados_limpos %>%
   separate_rows(x14_pensando_em_aumentar_sua_sensacao_de_seguranca_nos_diferentes_espacos_da_universidade_salas_corredores_areas_externas_etc_qual_das_acoes_abaixo_voce_considera_mais_urgente, sep = ";") %>%
   mutate(acao = str_trim(x14_pensando_em_aumentar_sua_sensacao_de_seguranca_nos_diferentes_espacos_da_universidade_salas_corredores_areas_externas_etc_qual_das_acoes_abaixo_voce_considera_mais_urgente)) %>%
@@ -116,24 +103,18 @@ top_3_acoes <- dados_limpos %>%
   top_n(3) %>%
   pull(acao)
 
-# Cálculo principal
 dados_perfil <- dados_limpos %>%
   
-  # --- AQUI ESTÁ A GRANDE MUDANÇA ---
-  # Cria a nossa própria coluna de agrupamento "Sim" vs "Não"
   mutate(group = case_when(
     x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Concordo totalmente", "Concordo parcialmente") ~ "Sim, Afetado",
     x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Discordo totalmente", "Discordo parcialmente") ~ "Não, Não Afetado",
-    TRUE ~ "Outro" # Agrupa o resto
+    TRUE ~ "Outro" 
   )) %>%
   
-  # Filtra para manter apenas os grupos que queremos comparar
   filter(group != "Outro") %>%
   
-  # Agrupa pela nossa nova coluna
   group_by(group) %>%
   
-  # Calcula todas as métricas
   summarise(
     `Confiança p/ Conversar` = mean(str_detect(x5_voce_sente_que_tem_alguem_em_quem_pode_confiar_para_conversar_caso_passe_por_uma_situacao_dificil_como_um_assedio, "Sim"), na.rm = TRUE) * 100,
     `Eventos (Média)` = mean(as.numeric(str_replace(x10_quantos_eventos_palestras_voce_participou_ou_ouviu_falar_que_foram_ofertados_pela_ufc_sobre_o_assunto, "4 ou mais", "4")), na.rm = TRUE),
@@ -151,11 +132,9 @@ dados_perfil <- dados_limpos %>%
          !!paste("Urgente:", top_3_acoes[3]) := `Urgente: Ação 3`) %>%
   mutate(across(where(is.numeric), ~replace_na(., 0)))
 
-# PASSO 2: NORMALIZAÇÃO DOS DADOS
 dados_perfil_normalizado <- dados_perfil %>%
   mutate(across(where(is.numeric), ~ scales::rescale(., to = c(0, 100))))
 
-# PASSO 3: CRIAÇÃO DO GRÁFICO
 ggradar(
   dados_perfil_normalizado,
   grid.min = 0, 
@@ -170,25 +149,14 @@ ggradar(
 
 
 
-#----------------------------------------------------------------------------------
-# ANÁLISE: IMPACTO NO DESEMPENHO (P15) POR CURSO
-#----------------------------------------------------------------------------------
-library(tidyverse)
-
-# Supondo que seu dataframe limpo se chame 'dados_limpos'
 dados_limpos %>%
-  # 1. Filtra os campi de interesse
   filter(x1_em_qual_campus_voce_estuda %in% c("Pici", "Benfica", "Labomar")) %>%
   
-  # 2. Remove respostas neutras ou vazias da P15 para focar na análise
   filter(!x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Prefiro não responder", "Não concordo e nem discordo")) %>%
   
-  # Usamos 'mutate' e 'fct_lump_n' para agrupar os 15 cursos com mais respostas
-  # e chamar todos os outros de "Outros". Isso limpa o gráfico.
   mutate(
     curso_agrupado = fct_lump_n(x3_qual_curso_voce_esta_realizando, n = 15),
     
-    # Reordena os níveis da P15 para que apareçam em uma ordem lógica na legenda do gráfico
     resposta_p15_ordenada = fct_relevel(
       x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada,
       "Concordo totalmente", "Concordo parcialmente", "Discordo parcialmente", "Discordo totalmente"
@@ -197,16 +165,9 @@ dados_limpos %>%
   
   # Cria o gráfico
   ggplot(aes(y = fct_rev(curso_agrupado), fill = resposta_p15_ordenada)) +
-  
-  # geom_bar com position = "fill" cria o gráfico de 100%
   geom_bar(position = "fill") +
-  
-  # Formata o eixo X para mostrar porcentagens
   scale_x_continuous(labels = scales::percent_format()) +
-  
-  # Usa uma paleta de cores divergente (Vermelho-Amarelo-Azul) que é ótima para escalas de concordância
   scale_fill_brewer(palette = "RdYlBu") +
-  
   labs(
     title = "Impacto no Desempenho Acadêmico por Curso",
     subtitle = "Análise para os campi Pici, Benfica e Labomar",
@@ -217,17 +178,9 @@ dados_limpos %>%
   theme_minimal() +
   theme(
     legend.position = "top",
-    axis.text.y = element_text(size = 8) # Ajusta o tamanho da fonte dos cursos
+    axis.text.y = element_text(size = 8) 
   ) + facet_wrap(~ x1_em_qual_campus_voce_estuda)
 
-
-
-
-
-
-
-
-library(tidyverse)
 
 dados_limpos %>%
   filter(x1_em_qual_campus_voce_estuda == "Labomar") %>%
@@ -256,13 +209,6 @@ dados_limpos %>%
   )
 
 
-
-
-
-
-
-
-library(tidyverse)
 dados_limpos %>%
   mutate(impacto_academico = case_when(
     x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Concordo totalmente", "Concordo parcialmente") ~ "Afetado",
@@ -289,47 +235,27 @@ dados_limpos %>%
 
 
 
-
-
-
-
-
-
-
-
-#----------------------------------------------------------------------------------
-# ANÁLISE FINAL: MINORIA (X4) vs. VIOLÊNCIA (X6) vs. IMPACTO (X15)
-#----------------------------------------------------------------------------------
-library(tidyverse)
-
-# Supondo que seu dataframe limpo se chame 'dados_limpos'
 dados_limpos %>%
-  # 1. Cria o grupo de "Impacto Acadêmico" a partir das respostas da P15
   mutate(impacto_academico = case_when(
     x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Concordo totalmente", "Concordo parcialmente") ~ "Desempenho Afetado",
     x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Discordo totalmente", "Discordo parcialmente") ~ "Desempenho Não Afetado",
-    TRUE ~ "Outro" # Agrupa "Não concordo e nem discordo" e "Prefiro não responder"
+    TRUE ~ "Outro" 
   )) %>%
   
-  # 2. Cria o grupo de "Identificação com Minoria" a partir das respostas da P4
   mutate(grupo_minoria = case_when(
     x4_voce_se_identifica_com_alguma_minoria_social == "Não" ~ "Não Pertence a Minoria",
     x4_voce_se_identifica_com_alguma_minoria_social == "Prefiro não responder" ~ "Outro",
     TRUE ~ "Pertence a Minoria" # Agrupa todas as outras respostas ("Parda/preta", "LGBTQIA+", etc.)
   )) %>%
   
-  # 3. Filtra para manter apenas os grupos que queremos comparar
   filter(impacto_academico != "Outro",
          grupo_minoria != "Outro") %>%
   
-  # 4. Separa os tipos de violência da P6
   separate_rows(x6_quais_tipos_de_violencia_voce_ja_vivenciou_ou_viu_outra_pessoa_vivenciar, sep = ";") %>%
   
-  # 5. Limpa os rótulos da violência
   mutate(violencia_limpa = str_trim(x6_quais_tipos_de_violencia_voce_ja_vivenciou_ou_viu_outra_pessoa_vivenciar)) %>%
   filter(violencia_limpa != "" & violencia_limpa != "Prefiro não informar") %>%
   
-  # 6. Cria o gráfico
   ggplot(aes(y = violencia_limpa, fill = impacto_academico)) +
   
   geom_bar(position = "fill") +
@@ -353,34 +279,6 @@ dados_limpos %>%
     strip.text = element_text(face = "bold", size = 10)
   )
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-library(tidyverse)
-library(ggradar)
 
 top_5_minorias <- dados_limpos %>%
   filter(!x4_voce_se_identifica_com_alguma_minoria_social %in% c("Não", "Prefiro não responder")) %>%
@@ -421,13 +319,6 @@ ggradar(
 
 
 
-#----------------------------------------------------------------------------------
-# ANÁLISE: IMPACTO ACADÊMICO (P15) NAS TOP 5 MINORIAS (X4)
-#----------------------------------------------------------------------------------
-library(tidyverse)
-
-# PASSO 1: IDENTIFICAR AS 5 PRINCIPAIS CATEGORIAS DE MINORIA
-# (Este passo é o mesmo de antes, para garantir que estamos focando nos grupos corretos)
 top_5_minorias <- dados_limpos %>%
   filter(!x4_voce_se_identifica_com_alguma_minoria_social %in% c("Não", "Prefiro não responder")) %>%
   count(x4_voce_se_identifica_com_alguma_minoria_social, sort = TRUE) %>%
@@ -435,12 +326,9 @@ top_5_minorias <- dados_limpos %>%
   pull(x4_voce_se_identifica_com_alguma_minoria_social)
 
 
-# PASSO 2: CALCULAR A PORCENTAGEM DE IMPACTO PARA CADA GRUPO
 impacto_por_minoria <- dados_limpos %>%
-  # Filtra para manter apenas as 5 principais categorias de minoria
   filter(x4_voce_se_identifica_com_alguma_minoria_social %in% top_5_minorias) %>%
   
-  # Cria a nossa coluna de agrupamento "Sim vs Não" a partir da P15
   mutate(impacto_academico = case_when(
     x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Concordo totalmente", "Concordo parcialmente") ~ "Afetado",
     x15_voce_ja_teve_seu_desempenho_academico_afetado_por_uma_situacao_que_voce_se_sentiu_violentada %in% c("Discordo totalmente", "Discordo parcialmente") ~ "Não Afetado",
@@ -448,27 +336,18 @@ impacto_por_minoria <- dados_limpos %>%
   )) %>%
   filter(impacto_academico != "Outro") %>%
   
-  # Conta quantos "Afetados" e "Não Afetados" existem para cada grupo de minoria
   count(group = x4_voce_se_identifica_com_alguma_minoria_social, impacto_academico) %>%
   
-  # Agrupa por minoria para calcular a porcentagem
   group_by(group) %>%
   mutate(porcentagem = n / sum(n)) %>%
   
-  # Filtra para manter apenas a porcentagem que nos interessa ("Afetado")
   filter(impacto_academico == "Afetado")
 
 
-# PASSO 3: CRIAÇÃO DO GRÁFICO DE BARRAS ORDENADO
 ggplot(impacto_por_minoria, aes(x = porcentagem, y = reorder(group, porcentagem))) +
   geom_col(fill = "#d9480f") +
-  
-  # Adiciona os rótulos de porcentagem diretamente no gráfico
   geom_text(aes(label = scales::percent(porcentagem, accuracy = 1)), hjust = -0.2) +
-  
-  # Formata o eixo X para mostrar porcentagens
   scale_x_continuous(labels = scales::percent, limits = c(0, 0.6), expand = expansion(mult = c(0, 0.05))) +
-  
   labs(
     title = "Impacto no Desempenho Acadêmico por Grupo de Minoria",
     subtitle = "Proporção de estudantes que relataram ter o desempenho afetado",
@@ -476,8 +355,6 @@ ggplot(impacto_por_minoria, aes(x = porcentagem, y = reorder(group, porcentagem)
     y = "Grupo de Minoria"
   ) +
   theme_minimal()
-
-
 
 
 
